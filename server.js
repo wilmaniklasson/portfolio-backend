@@ -7,6 +7,24 @@ dotenv.config();
 
 const app = express();
 app.use(cors());
+
+
+import cors from "cors";
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
+
+
+app.use(cors({
+  origin: function(origin, callback){
+    if (!origin) return callback(null, true); // tillåt Postman, curl osv utan origin
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS-policy: Denna origin är inte tillåten."));
+    }
+  }
+}));
+
 app.use(express.json());
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
