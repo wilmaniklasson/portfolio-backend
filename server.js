@@ -2,11 +2,11 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import OpenAI from "openai";
+import rateLimit from "express-rate-limit";
 
 dotenv.config();
 
 const app = express();
-app.use(cors());
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
 
@@ -22,6 +22,17 @@ app.use(cors({
   }
 }));
 
+const limiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 5,
+  handler: (req, res) => {
+    res.status(429).json({ code: "RATE_LIMIT", message: "Too many requests" });
+  },
+});
+
+app.use("/api/chat", limiter);
+
+// Middleware för att parsa JSON
 app.use(express.json());
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
