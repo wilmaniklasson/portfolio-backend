@@ -8,9 +8,6 @@ dotenv.config();
 const app = express();
 app.use(cors());
 
-
-import cors from "cors";
-
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
 
 
