@@ -3,13 +3,23 @@ import cors from "cors";
 import dotenv from "dotenv";
 import OpenAI from "openai";
 import rateLimit from "express-rate-limit";
+import client from "./db/mongoClient.js";
+import { logChat } from "./utils/logChat.js";
 
 dotenv.config();
 
 const app = express();
+const PORT = process.env.PORT || 3001;
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const wilmaInfo = process.env.WILMA_BOT_INFO;
 
+if (!wilmaInfo) {
+  console.error("WILMA_BOT_INFO är inte definierad i .env-filen!");
+  process.exit(1);
+}
+
+// --- Middleware ---
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
-
 
 app.use(cors({
   origin: function(origin, callback){
@@ -31,18 +41,9 @@ const limiter = rateLimit({
 });
 
 app.use("/api/chat", limiter);
-
-// Middleware för att parsa JSON
 app.use(express.json());
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-const wilmaInfo = process.env.WILMA_BOT_INFO;
-if (!wilmaInfo) {
-  console.error("WILMA_BOT_INFO är inte definierad i .env-filen!");
-  process.exit(1);
-}
-
+// --- Din Chat-endpoint ---
 app.post("/api/chat", async (req, res) => {
   const userMessage = req.body.message;
 
@@ -55,14 +56,30 @@ app.post("/api/chat", async (req, res) => {
       ],
     });
 
-    res.json({ reply: chatCompletion.choices[0].message.content });
+    const botReply = chatCompletion.choices[0].message.content;
+
+    await logChat(userMessage, botReply); // logga till MongoDB
+
+    res.json({ reply: botReply });
   } catch (error) {
-    console.error(error);
+    console.error("Fel i /api/chat:", error);
     res.status(500).json({ reply: "Oj, något gick fel på servern!" });
   }
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Servern körs på http://localhost:${PORT}`);
-});
+// --- Starta servern och koppla till MongoDB ---
+async function startServer() {
+  try {
+    await client.connect();
+    console.log("✅ Ansluten till MongoDB");
+
+    app.listen(PORT, () => {
+      console.log(`🚀 Servern körs på http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error("❌ Kunde inte ansluta till MongoDB:", error);
+    process.exit(1);
+  }
+}
+
+startServer();
